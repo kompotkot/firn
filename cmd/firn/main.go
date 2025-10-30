@@ -1,8 +1,11 @@
-package firn
+package main
 
 import (
 	"context"
 	"fmt"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"os"
 
@@ -11,7 +14,35 @@ import (
 	"github.com/kompotkot/firn/pkg/db"
 )
 
+const FIRN_VERSION = "0.0.1"
+
+var (
+	moduleTui func(context.Context, db.Database) error
+)
+
 func main() {
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: firn <command> [args]")
+		fmt.Println("Available commands: server, tui, version")
+		os.Exit(1)
+	}
+
+	var rModule string
+
+	switch os.Args[1] {
+	case "server":
+		rModule = "server"
+	case "tui":
+		// TODO(kompotkot): Check if build with tui
+		rModule = "tui"
+	case "version":
+		fmt.Println(FIRN_VERSION)
+		return
+	default:
+		fmt.Printf("Unknown command: %s\n", os.Args[1])
+		os.Exit(1)
+	}
+
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
@@ -42,6 +73,28 @@ func main() {
 		os.Exit(1)
 	}
 	log.Info("Database connection established successfully")
+
+	// Create context for graceful shutdown
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	switch rModule {
+	case "server":
+		// TODO(kompotkot): Initialize server in go-routine
+		fmt.Println("Not implemented yet")
+		return
+	case "tui":
+		log.Info("Starting TUI")
+		time.Sleep(3 * time.Second)
+		if err := moduleTui(ctx, database); err != nil {
+			log.Error("TUI error", "error", err)
+		}
+		stop()
+	}
+
+	// Wait for shutdown signal
+	<-ctx.Done()
+	log.Info("Received shutdown signal, starting graceful shutdown")
 
 	// Gracefully close database connection
 	log.Info("Closing database connection")
