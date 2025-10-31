@@ -85,7 +85,6 @@ func main() {
 		return
 	case "tui":
 		log.Info("Starting TUI")
-		time.Sleep(3 * time.Second)
 		if err := moduleTui(ctx, database); err != nil {
 			log.Error("TUI error", "error", err)
 		}
