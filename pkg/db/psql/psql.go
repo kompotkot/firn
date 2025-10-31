@@ -6,6 +6,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/kompotkot/firn/pkg/journal"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -41,4 +43,68 @@ func (p *PsqlDB) Close() error {
 		p.pool.Close()
 	}
 	return nil
+}
+
+
+// ListJournals lists all journals
+func (p *PsqlDB) ListJournals(ctx context.Context) ([]journal.Journal, error) {
+	query := `
+		SELECT id, name, created_at, updated_at FROM journal
+	`
+
+	rows, err := p.pool.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Scan the rows into the journals slice
+	var journals []journal.Journal
+	for rows.Next() {
+		var journal journal.Journal
+		err := rows.Scan(&journal.Id, &journal.Name, &journal.CreatedAt, &journal.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		journals = append(journals, journal)
+	}
+	
+	// Check for errors from the rows iteration cycle
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+
+	return journals, nil
+}
+
+// ListEntries lists all entries for a journal
+func (p *PsqlDB) ListEntries(ctx context.Context, journalId string) ([]journal.Entry, error) {
+	query := `
+		SELECT id, journal_id, title, content, created_at, updated_at FROM entry
+	`
+
+	rows, err := p.pool.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Scan the rows into the entries slice
+	var entries []journal.Entry
+	for rows.Next() {
+		var entry journal.Entry
+		err := rows.Scan(&entry.Id, &entry.JournalId, &entry.Title, &entry.Content, &entry.CreatedAt, &entry.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+	
+	// Check for errors from the rows iteration cycle
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return entries, nil
 }

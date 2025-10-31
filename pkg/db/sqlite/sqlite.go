@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kompotkot/firn/pkg/journal"
+
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -86,4 +88,14 @@ func (s *SqliteDB) Close() error {
 		return s.db.Close()
 	}
 	return nil
+}
+
+// ListJournals lists all journals
+func (s *SqliteDB) ListJournals(ctx context.Context) ([]journal.Journal, error) {
+	return nil, nil
+}
+
+// ListEntries lists all entries for a journal
+func (s *SqliteDB) ListEntries(ctx context.Context, journalId string) ([]journal.Entry, error) {
+	return nil, nil
 }
