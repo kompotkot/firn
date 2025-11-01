@@ -4,10 +4,13 @@ package psql
 
 import (
 	"context"
+	"strings"
 	"time"
 
+	"github.com/kompotkot/firn/pkg/db"
 	"github.com/kompotkot/firn/pkg/journal"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -45,37 +48,29 @@ func (p *PsqlDB) Close() error {
 	return nil
 }
 
+// ListJournals lists all journals ordered by updated_at
+func (p *PsqlDB) ListJournals(ctx context.Context, orderByDesc bool, limit, offset int) ([]journal.Journal, error) {
+	var sb strings.Builder
 
-// ListJournals lists all journals
-func (p *PsqlDB) ListJournals(ctx context.Context) ([]journal.Journal, error) {
-	query := `
-		SELECT id, name, created_at, updated_at FROM journal
-	`
+	sb.WriteString("SELECT id, name, created_at, updated_at FROM journal ORDER BY updated_at")
+	if orderByDesc {
+		sb.WriteString(" DESC")
+	}
+	sb.WriteString(" LIMIT $1 OFFSET $2")
 
-	rows, err := p.pool.Query(ctx, query)
+	query := sb.String()
+
+	if limit == 0 {
+		limit = db.JOURNAL_LIST_DEFAULT_LIMIT
+	}
+
+	rows, err := p.pool.Query(ctx, query, limit, offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	// Scan the rows into the journals slice
-	var journals []journal.Journal
-	for rows.Next() {
-		var journal journal.Journal
-		err := rows.Scan(&journal.Id, &journal.Name, &journal.CreatedAt, &journal.UpdatedAt)
-		if err != nil {
-			return nil, err
-		}
-		journals = append(journals, journal)
-	}
-	
-	// Check for errors from the rows iteration cycle
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-
-	return journals, nil
+	return pgx.CollectRows(rows, pgx.RowToStructByName[journal.Journal])
 }
 
 // ListEntries lists all entries for a journal

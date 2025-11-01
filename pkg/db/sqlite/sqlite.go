@@ -91,7 +91,7 @@ func (s *SqliteDB) Close() error {
 }
 
 // ListJournals lists all journals
-func (s *SqliteDB) ListJournals(ctx context.Context) ([]journal.Journal, error) {
+func (s *SqliteDB) ListJournals(ctx context.Context, orderByDesc bool, limit, offset int) ([]journal.Journal, error) {
 	return nil, nil
 }
 
