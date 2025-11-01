@@ -4,25 +4,44 @@ package tui
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/kompotkot/firn/pkg/db"
 	"github.com/kompotkot/firn/pkg/journal"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/paginator"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-)
-
-var (
-	appStyle = lipgloss.NewStyle().Padding(1, 2)
 )
 
 // Keymap for help panel
 type keymap = struct {
 	quit key.Binding
 }
+
+// item represents a journal in the list
+type item struct {
+	journal journal.Journal
+}
+
+func (i item) Title() string {
+	name := i.journal.Name
+	updatedAt := i.journal.UpdatedAt.Format(time.RFC3339)
+	return fmt.Sprintf("%s %s", name, updatedAt)
+}
+
+func (i item) Description() string {
+	id := i.journal.Id
+	createdAt := i.journal.CreatedAt.Format(time.RFC3339)
+	return fmt.Sprintf("ID: %s, Created At: %s", id, createdAt)
+}
+
+func (i item) FilterValue() string { return i.journal.Name }
 
 type model struct {
 	database db.Database
@@ -32,13 +51,24 @@ type model struct {
 	keys keymap
 	help help.Model
 
-	journals []journal.Journal
+	// List of journals
+	journalList list.Model
 
 	viewport viewport.Model
 }
 
 // Initialize TUI model
 func initModel(database db.Database) model {
+	jld := list.NewDefaultDelegate()
+	jld.Styles.SelectedTitle = listSelectedStyle
+
+	// Initialize journals list (dimensions will be set when window size is received)
+	jl := list.New([]list.Item{}, jld, 0, 0)
+	jl.Title = "Journals"
+	jl.SetFilteringEnabled(false)
+	jl.SetShowPagination(true)
+	jl.Paginator.Type = paginator.Arabic
+
 	return model{
 		database: database,
 
@@ -49,14 +79,14 @@ func initModel(database db.Database) model {
 			),
 		},
 
-		journals: []journal.Journal{},
+		journalList: jl,
 	}
 }
 
 // Execute commands concurrently with no ordering guarantees during initialization
 func (m model) Init() tea.Cmd {
 	return tea.Batch(
-		listJournals(m.database),
+		listJournals(m.database, false, 0, 0),
 	)
 }
 
@@ -73,6 +103,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 
+	// Journals loaded from database
+	case []journal.Journal:
+		if len(msg) > 0 {
+			items := make([]list.Item, len(msg))
+			for i, j := range msg {
+				items[i] = item{journal: j}
+			}
+			m.journalList.SetItems(items)
+			m.journalList.Paginator.SetTotalPages(len(msg))
+		}
+		m.viewport.SetContent("No journals found..")
+
+	// Window size changed
 	case tea.WindowSizeMsg:
 		header := m.headerView()
 		help := m.help.ShortHelpView([]key.Binding{m.keys.quit})
@@ -94,17 +137,39 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.ready {
 			// Initialize viewport only after receiving window dimensions (they arrive asynchronously)
 			m.viewport = viewport.New(msg.Width, viewportHeight)
+			m.journalList.SetSize(msg.Width, viewportHeight)
+
+			m.viewport.SetContent(m.journalList.View())
+
 			m.ready = true
 		} else {
 			m.viewport.Width = msg.Width
 			m.viewport.Height = viewportHeight
+			m.journalList.SetSize(msg.Width, viewportHeight)
+
+			// Update viewport content after resize
+			m.viewport.SetContent(m.journalList.View())
 		}
+
+	case error:
+		m.viewport.SetContent(fmt.Sprintf("Error occured: %v", msg))
 	}
 
-	// Handle keyboard events in the viewport
+	// Handle viewport events (scrolling, etc.)
 	var cmd tea.Cmd
 	m.viewport, cmd = m.viewport.Update(msg)
+	m.journalList.Paginator, cmd = m.journalList.Paginator.Update(msg)
 	cmds = append(cmds, cmd)
+
+	// Handle keyboard events in the list and update viewport content
+	if m.ready {
+		var listCmd tea.Cmd
+		m.journalList, listCmd = m.journalList.Update(msg)
+		cmds = append(cmds, listCmd)
+
+		// Update viewport content with the list after all updates
+		m.viewport.SetContent(m.journalList.View())
+	}
 
 	return m, tea.Batch(cmds...)
 }
