@@ -3,6 +3,8 @@
 package tui
 
 import (
+	"fmt"
+
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -10,6 +12,9 @@ import (
 var (
 	// Datetime format HH:MM:SS DD-MM-YYYY
 	datetimeFormat = "15:04:05 02-01-2006"
+
+	// 3 - from different paddings to not cut datetime at right side
+	magicWidthPaddingNum = 3
 
 	// appStyle = lipgloss.NewStyle().Padding(1, 2)
 
@@ -44,7 +49,8 @@ var (
 	listNoItemsStyle = lipgloss.NewStyle()
 
 	// --- Footer ---
-	footerStyle = lipgloss.NewStyle().Faint(true)
+	helpStyle  = lipgloss.NewStyle().Align(lipgloss.Left).Padding(0, 0, 0, 1).Faint(true)
+	debugStyle = lipgloss.NewStyle().Align(lipgloss.Right).Foreground(lipgloss.Color("#ff0000"))
 )
 
 // headerView represents the header view of the TUI
@@ -54,7 +60,16 @@ func (m model) headerView() string {
 
 // footerView represents the footer view of the TUI
 func (m model) footerView() string {
-	return footerStyle.Width(m.width).Align(lipgloss.Left).Render(m.help.ShortHelpView([]key.Binding{m.keys.quit}))
+	help := helpStyle.Render(m.help.ShortHelpView([]key.Binding{m.keys.quit}))
+
+	// Compose debug string
+	var debugStr string
+	if m.debugActive {
+		debugStr = fmt.Sprintf("%s [DEBUG]", m.debugStr)
+	}
+
+	debug := debugStyle.Width(m.width - len(debugStr)).Render(debugStr)
+	return lipgloss.NewStyle().Width(m.width).Render(help + debug)
 }
 
 // invertFBGColors creates a new style with inverted foreground and background colors

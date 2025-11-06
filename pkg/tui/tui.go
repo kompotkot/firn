@@ -12,45 +12,10 @@ import (
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
-	"github.com/charmbracelet/bubbles/paginator"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
-
-// Keymap for help panel
-type keymap = struct {
-	quit key.Binding
-}
-
-// jItem represents a journal in the list
-type jItem struct {
-	journal journal.Journal
-
-	widthTitle int // Width for Title
-	widthDesc  int // Width for Description
-}
-
-func (i jItem) Title() string {
-	name := lipgloss.NewStyle().Render(i.journal.Name)
-
-	// Create right-aligned updated_at with widthTitle
-	updatedAt := lipgloss.NewStyle().Width(i.widthTitle).Align(lipgloss.Right).Render(i.journal.UpdatedAt.Format(datetimeFormat))
-
-	return name + updatedAt
-}
-
-func (i jItem) Description() string {
-	id := fmt.Sprintf("ID: %s", i.journal.Id)
-
-	// Create right-aligned "Created At: {timestamp}" with widthDesc
-	createdAtText := fmt.Sprintf("Created At: %s", i.journal.CreatedAt.Format(datetimeFormat))
-	createdAt := lipgloss.NewStyle().Width(i.widthDesc).Align(lipgloss.Right).Render(createdAtText)
-
-	return id + createdAt
-}
-
-func (i jItem) FilterValue() string { return i.journal.Name }
 
 type model struct {
 	database db.Database
@@ -67,35 +32,22 @@ type model struct {
 
 	// Window width for dynamic item rendering
 	width int
+
+	// Debug
+	debugActive bool
+	debugStr    string
 }
 
 // Initialize TUI model
 func initModel(database db.Database) model {
-	// Journal list item styles
-	jld := list.NewDefaultDelegate()
-	jld.Styles.SelectedTitle = listSelectedTitleStyle
-	jld.Styles.SelectedDesc = listSelectedDescStyle
-
-	// Initialize journals list (dimensions will be set when window size is received)
-	jl := list.New([]list.Item{}, jld, 0, 0)
-	jl.Title = "Journals"
-	jl.SetFilteringEnabled(false)
-	jl.SetShowPagination(true)
-	jl.Paginator.Type = paginator.Arabic
-	jl.Styles.Title = listTitleStyle
-	jl.Styles.NoItems = listNoItemsStyle
-
 	return model{
 		database: database,
 
-		keys: keymap{
-			quit: key.NewBinding(
-				key.WithKeys("q", "ctrl+c"),
-				key.WithHelp("q", "quit"),
-			),
-		},
+		keys: initKeymap(),
 
-		journalList: jl,
+		journalList: initJournalList(),
+
+		debugActive: initDebug(),
 	}
 }
 
@@ -126,8 +78,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			for i, j := range msg {
 				items[i] = jItem{
 					journal:    j,
-					widthTitle: m.width - len(j.Name) - 3,                      // 3 - from different paddings to not cut datetime at right side
-					widthDesc:  m.width - len(fmt.Sprintf("ID: %s", j.Id)) - 3, // Available width for Description (full width minus ID length)
+					widthTitle: m.width - len(j.Name) - magicWidthPaddingNum,
+					widthDesc:  m.width - len(fmt.Sprintf("ID: %s", j.Id)) - magicWidthPaddingNum, // Available width for Description (full width minus ID length)
 				}
 			}
 			m.journalList.SetItems(items)
