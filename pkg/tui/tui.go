@@ -5,7 +5,6 @@ package tui
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/kompotkot/firn/pkg/db"
 	"github.com/kompotkot/firn/pkg/journal"
@@ -24,24 +23,34 @@ type keymap = struct {
 	quit key.Binding
 }
 
-// item represents a journal in the list
-type item struct {
+// jItem represents a journal in the list
+type jItem struct {
 	journal journal.Journal
+
+	widthTitle int // Width for Title
+	widthDesc  int // Width for Description
 }
 
-func (i item) Title() string {
-	name := i.journal.Name
-	updatedAt := i.journal.UpdatedAt.Format(time.RFC3339)
-	return fmt.Sprintf("%s %s", name, updatedAt)
+func (i jItem) Title() string {
+	name := lipgloss.NewStyle().Render(i.journal.Name)
+
+	// Create right-aligned updated_at with widthTitle
+	updatedAt := lipgloss.NewStyle().Width(i.widthTitle).Align(lipgloss.Right).Render(i.journal.UpdatedAt.Format(datetimeFormat))
+
+	return name + updatedAt
 }
 
-func (i item) Description() string {
-	id := i.journal.Id
-	createdAt := i.journal.CreatedAt.Format(time.RFC3339)
-	return fmt.Sprintf("ID: %s, Created At: %s", id, createdAt)
+func (i jItem) Description() string {
+	id := fmt.Sprintf("ID: %s", i.journal.Id)
+
+	// Create right-aligned "Created At: {timestamp}" with widthDesc
+	createdAtText := fmt.Sprintf("Created At: %s", i.journal.CreatedAt.Format(datetimeFormat))
+	createdAt := lipgloss.NewStyle().Width(i.widthDesc).Align(lipgloss.Right).Render(createdAtText)
+
+	return id + createdAt
 }
 
-func (i item) FilterValue() string { return i.journal.Name }
+func (i jItem) FilterValue() string { return i.journal.Name }
 
 type model struct {
 	database db.Database
@@ -55,12 +64,17 @@ type model struct {
 	journalList list.Model
 
 	viewport viewport.Model
+
+	// Window width for dynamic item rendering
+	width int
 }
 
 // Initialize TUI model
 func initModel(database db.Database) model {
+	// Journal list item styles
 	jld := list.NewDefaultDelegate()
-	jld.Styles.SelectedTitle = listSelectedStyle
+	jld.Styles.SelectedTitle = listSelectedTitleStyle
+	jld.Styles.SelectedDesc = listSelectedDescStyle
 
 	// Initialize journals list (dimensions will be set when window size is received)
 	jl := list.New([]list.Item{}, jld, 0, 0)
@@ -68,6 +82,8 @@ func initModel(database db.Database) model {
 	jl.SetFilteringEnabled(false)
 	jl.SetShowPagination(true)
 	jl.Paginator.Type = paginator.Arabic
+	jl.Styles.Title = listTitleStyle
+	jl.Styles.NoItems = listNoItemsStyle
 
 	return model{
 		database: database,
@@ -108,7 +124,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(msg) > 0 {
 			items := make([]list.Item, len(msg))
 			for i, j := range msg {
-				items[i] = item{journal: j}
+				items[i] = jItem{
+					journal:    j,
+					widthTitle: m.width - len(j.Name) - 3,                      // 3 - from different paddings to not cut datetime at right side
+					widthDesc:  m.width - len(fmt.Sprintf("ID: %s", j.Id)) - 3, // Available width for Description (full width minus ID length)
+				}
 			}
 			m.journalList.SetItems(items)
 			m.journalList.Paginator.SetTotalPages(len(msg))
@@ -118,38 +138,52 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Window size changed
 	case tea.WindowSizeMsg:
 		header := m.headerView()
-		help := m.help.ShortHelpView([]key.Binding{m.keys.quit})
+		footer := m.footerView()
 
-		// Calculate actual heights including any styling
+		// Calculate actual heights including any styling (borders, padding, etc.)
 		headerHeight := lipgloss.Height(header)
-		helpHeight := lipgloss.Height(help)
+		footerHeight := lipgloss.Height(footer)
 
 		// lipgloss.JoinVertical adds newlines between elements
-		// For 3 elements (header, viewport, help) there will be 2 newlines
-		verticalMargin := 0 // TODO(kompotkot): Check if set to 2 when content is added
-		viewportHeight := msg.Height - headerHeight - helpHeight - verticalMargin
+		// For 3 elements (header, viewport, footer) there will be 2 newlines
+
+		viewportHeight := msg.Height - headerHeight - footerHeight
 
 		// Ensure viewport height is at least 0
 		if viewportHeight < 0 {
 			viewportHeight = 0
 		}
 
+		// Update width for dynamic item rendering
+		m.width = msg.Width
+
 		if !m.ready {
 			// Initialize viewport only after receiving window dimensions (they arrive asynchronously)
 			m.viewport = viewport.New(msg.Width, viewportHeight)
-			m.journalList.SetSize(msg.Width, viewportHeight)
-
-			m.viewport.SetContent(m.journalList.View())
-
 			m.ready = true
 		} else {
 			m.viewport.Width = msg.Width
 			m.viewport.Height = viewportHeight
-			m.journalList.SetSize(msg.Width, viewportHeight)
-
-			// Update viewport content after resize
-			m.viewport.SetContent(m.journalList.View())
 		}
+
+		m.journalList.SetSize(msg.Width, viewportHeight)
+
+		// Update all items with new width
+		currentItems := m.journalList.Items()
+		updatedItems := make([]list.Item, len(currentItems))
+		for i, it := range currentItems {
+			if ji, ok := it.(jItem); ok {
+				ji.widthTitle = m.width - len(ji.journal.Name) - rightPaddingDatetime
+				ji.widthDesc = m.width - len(fmt.Sprintf("ID: %s", ji.journal.Id)) - rightPaddingDatetime // Available width for Description (full width minus ID length)
+				updatedItems[i] = ji
+			} else {
+				updatedItems[i] = it
+			}
+		}
+		m.journalList.SetItems(updatedItems)
+
+		// Update viewport content after resize
+		m.viewport.SetContent(m.journalList.View())
 
 	case error:
 		m.viewport.SetContent(fmt.Sprintf("Error occured: %v", msg))
@@ -181,13 +215,13 @@ func (m model) View() string {
 	}
 
 	header := m.headerView()
-	help := m.help.ShortHelpView([]key.Binding{m.keys.quit})
+	footer := m.footerView()
 
-	// Build the view: header, viewport, help
+	// Build the view: header, viewport, footer
 	return lipgloss.JoinVertical(lipgloss.Left,
 		header,
 		m.viewport.View(),
-		help,
+		footer,
 	)
 }
 
