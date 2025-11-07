@@ -96,6 +96,6 @@ func (s *SqliteDB) ListJournals(ctx context.Context, orderByDesc bool, limit, of
 }
 
 // ListEntries lists all entries for a journal
-func (s *SqliteDB) ListEntries(ctx context.Context, journalId string) ([]journal.Entry, error) {
+func (s *SqliteDB) ListEntries(ctx context.Context, journalId string, orderByDesc bool, limit, offset int) ([]journal.Entry, error) {
 	return nil, nil
 }

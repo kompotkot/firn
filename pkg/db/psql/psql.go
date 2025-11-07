@@ -74,32 +74,26 @@ func (p *PsqlDB) ListJournals(ctx context.Context, orderByDesc bool, limit, offs
 }
 
 // ListEntries lists all entries for a journal
-func (p *PsqlDB) ListEntries(ctx context.Context, journalId string) ([]journal.Entry, error) {
-	query := `
-		SELECT id, journal_id, title, content, created_at, updated_at FROM entry
-	`
+func (p *PsqlDB) ListEntries(ctx context.Context, journalId string, orderByDesc bool, limit, offset int) ([]journal.Entry, error) {
+	var sb strings.Builder
 
-	rows, err := p.pool.Query(ctx, query)
+	sb.WriteString("SELECT id, journal_id, title, content, created_at, updated_at FROM entry WHERE journal_id = $1 ORDER BY updated_at")
+	if orderByDesc {
+		sb.WriteString(" DESC")
+	}
+	sb.WriteString(" LIMIT $2 OFFSET $3")
+
+	query := sb.String()
+
+	if limit == 0 {
+		limit = db.ENTRY_LIST_DEFAULT_LIMIT
+	}
+
+	rows, err := p.pool.Query(ctx, query, journalId, limit, offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	// Scan the rows into the entries slice
-	var entries []journal.Entry
-	for rows.Next() {
-		var entry journal.Entry
-		err := rows.Scan(&entry.Id, &entry.JournalId, &entry.Title, &entry.Content, &entry.CreatedAt, &entry.UpdatedAt)
-		if err != nil {
-			return nil, err
-		}
-		entries = append(entries, entry)
-	}
-	
-	// Check for errors from the rows iteration cycle
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return entries, nil
+	return pgx.CollectRows(rows, pgx.RowToStructByName[journal.Entry])
 }
