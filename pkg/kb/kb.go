@@ -1,4 +1,4 @@
-package journal
+package kb
 
 import "time"
 
@@ -18,4 +18,16 @@ type Entry struct {
 	Content   string    `json:"content"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// Tag represents a label assigned to journal entry
+type Tag struct {
+	Id    string `json:"id"`
+	Label string `json:"label"`
+}
+
+// Assignments of tags to entries
+type TagAssignment struct {
+	TagId   string `json:"tag_id"`
+	EntryId string `json:"entry_id"`
 }

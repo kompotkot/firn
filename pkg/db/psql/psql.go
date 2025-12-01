@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/kompotkot/firn/pkg/db"
-	"github.com/kompotkot/firn/pkg/journal"
+	"github.com/kompotkot/firn/pkg/kb"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -49,10 +49,10 @@ func (p *PsqlDB) Close() error {
 }
 
 // ListJournals lists all journals ordered by updated_at
-func (p *PsqlDB) ListJournals(ctx context.Context, orderByDesc bool, limit, offset int) ([]journal.Journal, error) {
+func (p *PsqlDB) ListJournals(ctx context.Context, orderByDesc bool, limit, offset int) ([]kb.Journal, error) {
 	var sb strings.Builder
 
-	sb.WriteString("SELECT id, name, created_at, updated_at FROM journal ORDER BY updated_at")
+	sb.WriteString("SELECT id, name, created_at, updated_at FROM journals ORDER BY updated_at")
 	if orderByDesc {
 		sb.WriteString(" DESC")
 	}
@@ -70,14 +70,14 @@ func (p *PsqlDB) ListJournals(ctx context.Context, orderByDesc bool, limit, offs
 	}
 	defer rows.Close()
 
-	return pgx.CollectRows(rows, pgx.RowToStructByName[journal.Journal])
+	return pgx.CollectRows(rows, pgx.RowToStructByName[kb.Journal])
 }
 
 // ListEntries lists all entries for a journal
-func (p *PsqlDB) ListEntries(ctx context.Context, journalId string, orderByDesc bool, limit, offset int) ([]journal.Entry, error) {
+func (p *PsqlDB) ListEntries(ctx context.Context, journalId string, orderByDesc bool, limit, offset int) ([]kb.Entry, error) {
 	var sb strings.Builder
 
-	sb.WriteString("SELECT id, journal_id, title, content, created_at, updated_at FROM entry WHERE journal_id = $1 ORDER BY updated_at")
+	sb.WriteString("SELECT id, journal_id, title, content, created_at, updated_at FROM entries WHERE journal_id = $1 ORDER BY updated_at")
 	if orderByDesc {
 		sb.WriteString(" DESC")
 	}
@@ -95,5 +95,77 @@ func (p *PsqlDB) ListEntries(ctx context.Context, journalId string, orderByDesc 
 	}
 	defer rows.Close()
 
-	return pgx.CollectRows(rows, pgx.RowToStructByName[journal.Entry])
+	return pgx.CollectRows(rows, pgx.RowToStructByName[kb.Entry])
+}
+
+// GetJournalById retrieves a journal by its ID
+func (p *PsqlDB) GetJournalById(ctx context.Context, id string) (*kb.Journal, error) {
+	// TODO(kompotkot): Implement
+	return nil, nil
+}
+
+// CreateJournal creates a new journal with the given name
+func (p *PsqlDB) CreateJournal(ctx context.Context, name string) (*kb.Journal, error) {
+	// TODO(kompotkot): Implement
+	return nil, nil
+}
+
+// DeleteJournal deletes a journal by its ID
+func (p *PsqlDB) DeleteJournal(ctx context.Context, id string) error {
+	// TODO(kompotkot): Implement
+	return nil
+}
+
+// GetEntryById retrieves an entry by journal ID and entry ID
+func (p *PsqlDB) GetEntryById(ctx context.Context, journalId, entryId string) (*kb.Entry, error) {
+	// TODO(kompotkot): Implement
+	return nil, nil
+}
+
+// CreateEntry creates a new entry in the specified journal
+func (p *PsqlDB) CreateEntry(ctx context.Context, journalId, title, content string) (*kb.Entry, error) {
+	// TODO(kompotkot): Implement
+	return nil, nil
+}
+
+// DeleteEntry deletes an entry by journal ID and entry ID
+func (p *PsqlDB) DeleteEntry(ctx context.Context, journalId, entryId string) error {
+	// TODO(kompotkot): Implement
+	return nil
+}
+
+// ListEntryTags lists all tags assigned to an entry
+func (p *PsqlDB) ListEntryTags(ctx context.Context, journalId, entryId string) ([]kb.Tag, error) {
+	// TODO(kompotkot): Implement
+	return nil, nil
+}
+
+// AssignTagsToEntry assigns tags to an entry
+func (p *PsqlDB) AssignTagsToEntry(ctx context.Context, journalId, entryId string, tagIds []string) error {
+	// TODO(kompotkot): Implement
+	return nil
+}
+
+// DeAssignTagsToEntry removes tag assignments from an entry
+func (p *PsqlDB) DeAssignTagsToEntry(ctx context.Context, journalId, entryId string, tagIds []string) error {
+	// TODO(kompotkot): Implement
+	return nil
+}
+
+// ListTags lists all tags, optionally filtered by labels
+func (p *PsqlDB) ListTags(ctx context.Context, labels []string) ([]kb.Tag, error) {
+	// TODO(kompotkot): Implement
+	return nil, nil
+}
+
+// CreateTags creates new tags with the given labels
+func (p *PsqlDB) CreateTags(ctx context.Context, labels []string) ([]kb.Tag, error) {
+	// TODO(kompotkot): Implement
+	return nil, nil
+}
+
+// DeleteTags deletes tags by their IDs
+func (p *PsqlDB) DeleteTags(ctx context.Context, ids []string) error {
+	// TODO(kompotkot): Implement
+	return nil
 }
