@@ -118,8 +118,20 @@ func (p *PsqlDB) DeleteJournal(ctx context.Context, id string) error {
 
 // GetEntryById retrieves an entry by journal ID and entry ID
 func (p *PsqlDB) GetEntryById(ctx context.Context, journalId, entryId string) (*kb.Entry, error) {
-	// TODO(kompotkot): Implement
-	return nil, nil
+	query := "SELECT id, journal_id, title, content, created_at, updated_at FROM entries WHERE journal_id = $1 AND id = $2"
+
+	row := p.pool.QueryRow(ctx, query, journalId, entryId)
+
+	var entry kb.Entry
+	err := row.Scan(&entry.Id, &entry.JournalId, &entry.Title, &entry.Content, &entry.CreatedAt, &entry.UpdatedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &entry, nil
 }
 
 // CreateEntry creates a new entry in the specified journal

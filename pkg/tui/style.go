@@ -4,8 +4,8 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
-	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -60,7 +60,19 @@ func (m model) headerView() string {
 
 // footerView represents the footer view of the TUI
 func (m model) footerView() string {
-	help := helpStyle.Render(m.help.ShortHelpView([]key.Binding{m.keys.quit}))
+	// Show different help based on focus state
+	var helpBindings []key.Binding
+	switch {
+	case m.focusState == focusJournals:
+		helpBindings = []key.Binding{m.keys.quit, m.keys.enter}
+	case m.focusState == focusEntries && m.selectedJournalId != "":
+		helpBindings = []key.Binding{m.keys.esc, m.keys.enter}
+	case m.focusState == focusEntry:
+		helpBindings = []key.Binding{m.keys.esc}
+	default:
+		helpBindings = []key.Binding{m.keys.quit}
+	}
+	help := helpStyle.Render(renderHelpBindings(helpBindings))
 
 	// Compose debug string
 	var debugStr string
@@ -70,6 +82,38 @@ func (m model) footerView() string {
 
 	debug := debugStyle.Width(m.width - len(debugStr)).Render(debugStr)
 	return lipgloss.NewStyle().Width(m.width).Render(help + debug)
+}
+
+func renderHelpBindings(bindings []key.Binding) string {
+	if len(bindings) == 0 {
+		return ""
+	}
+
+	parts := make([]string, 0, len(bindings))
+	for _, b := range bindings {
+		if !b.Enabled() {
+			continue
+		}
+
+		helpInfo := b.Help()
+		keyStr := helpInfo.Key
+		desc := helpInfo.Desc
+
+		if keyStr == "" {
+			keyStr = strings.Join(b.Keys(), "/")
+		}
+
+		switch {
+		case keyStr != "" && desc != "":
+			parts = append(parts, fmt.Sprintf("%s %s", keyStr, desc))
+		case keyStr != "":
+			parts = append(parts, keyStr)
+		case desc != "":
+			parts = append(parts, desc)
+		}
+	}
+
+	return strings.Join(parts, " | ")
 }
 
 // invertFBGColors creates a new style with inverted foreground and background colors

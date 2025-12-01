@@ -6,7 +6,7 @@ require (
 	github.com/charmbracelet/bubbles v0.21.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
-	github.com/kompotkot/firn v0.0.0-20251030081630-f95c75103685
+	github.com/kompotkot/firn v0.0.0-20251201163358-0761cea163af
 )
 
 require (
