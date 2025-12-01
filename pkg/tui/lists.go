@@ -7,7 +7,6 @@ import (
 
 	"github.com/kompotkot/firn/pkg/kb"
 
-	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/paginator"
 	"github.com/charmbracelet/bubbles/textarea"

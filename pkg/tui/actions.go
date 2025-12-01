@@ -9,6 +9,7 @@ import (
 	"github.com/kompotkot/firn/pkg/db"
 	"github.com/kompotkot/firn/pkg/kb"
 
+	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
